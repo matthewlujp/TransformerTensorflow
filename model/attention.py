@@ -7,7 +7,7 @@ class MultiheadAttention(tf.keras.Model):
 
     def __init__(self, vec_size, num_heads, dropout_rate, apply_triangle_mask=False):
         super().__init__()
-        assert vec_size % num_heads == 0, f"vec_size ={vec_size} is not multiple of num_head ={num_head}"
+        assert vec_size % num_heads == 0, f"vec_size ={vec_size} is not multiple of num_head ={num_heads}"
         self._vec_size = vec_size
         self._num_heads = num_heads
         self._head_size = int(vec_size / num_heads)
@@ -45,9 +45,10 @@ class MultiheadAttention(tf.keras.Model):
             head = attention @ V
             head_outputs.append(head)
 
-        x = tf.concat(head_outputs, axis=-1) # B, L, V
+        x = tf.concat(head_outputs, -1) # B, L, V
         x = self._dropout(x)
         return self._layer_norm(x + query)
+
 
 
 

@@ -28,26 +28,51 @@ class Transformer(tf.keras.Model):
         self._encoder = Encoder(self._maxlen_enc, self._embedding_layer, self._vec_size, self._num_stacks, self._num_words)
         self._decoder = Decoder(self._maxlen_dec, self._embedding_layer, self._vec_size, self._num_stacks, self._num_words)
 
+    @property
+    def vector_size(self):
+        return self._vec_size
 
+    @property
+    def max_encoder_length(self):
+        return self._maxlen_enc
+
+    @property
+    def max_decoder_length(self):
+        return self._maxlen_dec
+
+    @tf.function
     def call(self, inputs):
         """
-        inputs: (dict) encoder_input, decoder_input
+        inputs: (dict)
         encoder_input: B, L
         decoder_input: B, L
         """
         e_mask = tf.cast(tf.sign(inputs['encoder_input']), tf.float32) # B,L
-        encoder_outputs = self._encoder({
-            'encoder_input': inputs['encoder_input'],
-            'encoder_mask': e_mask,
-        })
+        encoder_outputs = self._encoder(inputs['encoder_input'], e_mask)
         d_mask = tf.cast(tf.sign(inputs['decoder_input']), tf.float32) # B,L
-        decoder_output = self._decoder({
-            'encoder_outputs': encoder_outputs,
-            'encoder_mask': e_mask,
-            'decoder_input': inputs['decoder_input'],
-            'decoder_mask': d_mask,
-        })
+        decoder_output = self._decoder(encoder_outputs, e_mask, inputs['decoder_input'], d_mask)
         return decoder_output # B, L, NUM_WORD
+
+    @tf.function
+    def encode(self, encoder_input):
+        """
+        encoder_input: B, L
+        """
+        mask = tf.cast(tf.sign(encoder_input), tf.float32) # B,L
+        return self._encoder(encoder_input, mask)
+
+    @tf.function
+    def decode(self, encoder_input, encoder_outputs, decoder_input):
+        """
+        encoder_input: (tf.Tensor) B, L
+        encoder_outputs: (tf.Tensor) N, B, L, V
+        decoder_input: (tf.Tensor) B, L
+        """
+        enc_mask = tf.cast(tf.sign(encoder_input), tf.float32) # B,L
+        dec_mask = tf.cast(tf.sign(decoder_input), tf.float32) # B,L
+        return self._decoder(encoder_outputs, enc_mask, decoder_input, dec_mask)
+
+        
         
 
 
@@ -69,13 +94,13 @@ class Encoder(tf.keras.Model):
         self._ffn_layers = [
             FFN(self._maxlen, self._vec_size, DROPOUT_RATE) for _ in range(self._num_stacks)]
         
-    tf.function(input_signature=[
-        tf.TensorSpec
-    ])
+    @tf.function
     def call(self, encoder_input, encoder_mask):
-        e_i = inputs['encoder_input']
-        e_mask = inputs['encoder_mask']
-
+        """
+        inputs: (dict)
+        encoder_input: B, L
+        decoder_mask: B, L
+        """
         x = self._embedding_layer(encoder_input) # B, L, V
         x = self._layer_norm(x)
         x *= tf.sqrt(float(self._vec_size))
@@ -91,6 +116,7 @@ class Encoder(tf.keras.Model):
             x *= encoder_mask[..., None]
             encoder_outputs.append(x)
 
+        # return tf.stack(encoder_outputs, 0)
         return encoder_outputs
 
         
@@ -105,7 +131,7 @@ class Decoder(tf.keras.Model):
         self._num_stacks = num_stacks
         self._num_words = num_words
 
-        self._layer_norm = tfkl.LayerNormalization()
+        self._layer_norm = tfkl.LayerNormalization(axis=2)
         self._dropout = tfkl.Dropout(DROPOUT_RATE)
         self._self_attention_layers = [
             MultiheadAttention(self._vec_size, NUM_HEADS, DROPOUT_RATE, apply_triangle_mask=True) for _ in range(self._num_stacks)]
@@ -115,16 +141,16 @@ class Decoder(tf.keras.Model):
             FFN(self._maxlen, self._vec_size, DROPOUT_RATE) for _ in range(self._num_stacks)]
         self._output_dense = tfkl.Dense(self._num_words)
 
-    def call(self, inputs):
+    @tf.function
+    def call(self, encoder_outputs, encoder_mask, decoder_input, decoder_mask):
         """
-        inputs: (dict) encoder_outputs, decoder_input, encoder_mask, decoder_mask
+        inputs: (dict)
+        encoder_outputs: H, B, L, V
+        encoder_mask: B, L
+        decoder_input: B, L
+        decoder_mask: B, L
         """
-        d_i = inputs['decoder_input'] # B, L
-        d_mask = inputs['decoder_mask'] # B, L
-        encoder_outputs = inputs['encoder_outputs']
-        e_mask = inputs['encoder_mask']
-
-        x = self._embedding_layer(d_i) # B, L, V
+        x = self._embedding_layer(decoder_input) # B, L, V
         x = self._layer_norm(x)
         x *= tf.sqrt(float(self._vec_size))
         pos_emb = get_positional_encoding(self._maxlen, self._vec_size) # L, V
@@ -132,20 +158,23 @@ class Decoder(tf.keras.Model):
         x = self._dropout(x)
 
         for i in range(self._num_stacks):
-            # self attention
             x = self._self_attention_layers[i](
-                query=x, key=x, value=x, query_mask=d_mask, value_mask=d_mask)
+                query=x, key=x, value=x, query_mask=decoder_mask, value_mask=decoder_mask)
             
             # source-target attention
             x = self._source_target_attention_layers[i](
-                query=x, key=encoder_outputs[i], value=encoder_outputs[i], query_mask=d_mask, value_mask=e_mask)
+                # query=x, key=tf.gather(encoder_outputs, i, axis=0),
+                # value=tf.gather(encoder_outputs, i, axis=0),
+                query=x, key=encoder_outputs[i],
+                value=encoder_outputs[i],
+                query_mask=decoder_mask, value_mask=encoder_mask)
 
             # FNN
             x = self._ffn_layers[i](x)
-            x *= d_mask[..., None]
+            x *= decoder_mask[..., None]
 
         # apply linear layer and softmax
-        x *= d_mask[..., None] # B,L,V
+        x *= decoder_mask[..., None] # B,L,V
         x = self._output_dense(x)
         # decoder_output = tfkl.Softmax()(x)
         decoder_output = x # output logit
