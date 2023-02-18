@@ -69,14 +69,14 @@ class Encoder(tf.keras.Model):
         self._ffn_layers = [
             FFN(self._maxlen, self._vec_size, DROPOUT_RATE) for _ in range(self._num_stacks)]
         
-    def call(self, inputs):
-        """
-        inputs: (dict) encoder_input, encoder_mask
-        """
+    tf.function(input_signature=[
+        tf.TensorSpec
+    ])
+    def call(self, encoder_input, encoder_mask):
         e_i = inputs['encoder_input']
         e_mask = inputs['encoder_mask']
 
-        x = self._embedding_layer(e_i) # B, L, V
+        x = self._embedding_layer(encoder_input) # B, L, V
         x = self._layer_norm(x)
         x *= tf.sqrt(float(self._vec_size))
         pos_emb = get_positional_encoding(self._maxlen, self._vec_size) # L, V
@@ -86,9 +86,9 @@ class Encoder(tf.keras.Model):
         encoder_outputs = []
         for i in range(self._num_stacks):
             x = self._attention_layers[i](
-                query=x, key=x, value=x, query_mask=e_mask, value_mask=e_mask)
+                query=x, key=x, value=x, query_mask=encoder_mask, value_mask=encoder_mask)
             x = self._ffn_layers[i](x)
-            x *= e_mask[..., None]
+            x *= encoder_mask[..., None]
             encoder_outputs.append(x)
 
         return encoder_outputs

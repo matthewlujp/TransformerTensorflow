@@ -61,6 +61,4 @@ def get_trainagle_mask(mat: tf.Tensor) -> tf.Tensor:
     1 1 0 0 ...
     1 1 1 0 ...
     """
-    t = tf.ones_like(mat) # B, L, L
-    t = tf.cumsum(t, axis=1) # B, L, L
-    return tf.cast((t - tf.transpose(t, [0, 2, 1])) >= 0, tf.float32)
+    return tf.linalg.band_part(tf.ones_like(mat), -1, 0)
