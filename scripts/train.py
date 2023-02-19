@@ -117,8 +117,8 @@ def train(_):
     train_dataset, val_dataset = create_dataset(data, FLAGS.validation_split_rate)
 
     if FLAGS.debug:
-        with tf.device('CPU'):
-            model = create_model(FLAGS.maxlen_enc, FLAGS.maxlen_dec, 16, 2, len(data['words']), train_dataset)
+        # with tf.device('CPU'):
+        model = create_model(FLAGS.maxlen_enc, FLAGS.maxlen_dec, 16, 2, len(data['words']), train_dataset)
         train_dataset = train_dataset.take(80).batch(10).prefetch(3)
         val_dataset = val_dataset.take(40).batch(10)
     else:
@@ -145,7 +145,7 @@ def train(_):
             tf.keras.callbacks.ModelCheckpoint(
               filepath=str(ckptdir) + "/checkpoint-epoch={epoch:02d}-val_loss={val_loss:.02f}.hdf5",
               save_freq='epoch', save_weights_only=True),
-            tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=1, verbose=1),
+            tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=2, verbose=1),
             tf.keras.callbacks.TensorBoard(logdir, histogram_freq=10),
             UpdateLearningRate(),
         ],
@@ -167,7 +167,9 @@ def train(_):
             'encode': model.encode.get_concrete_function(tf.TensorSpec([None, model.max_encoder_length], dtype=tf.int32, name='encoder_input')),
             'decode': model.decode.get_concrete_function(
                 encoder_input=tf.TensorSpec([None, model.max_encoder_length], dtype=tf.int32, name='encoder_input'),
-                encoder_outputs=tf.TensorSpec([None, model.max_encoder_length], dtype=tf.int32, name='encoder_outputs'),
+                encoder_outputs=[
+                    tf.TensorSpec([None, model.max_encoder_length, model.vector_size], dtype=tf.float32, name='encoder_outputs')
+                    for _ in range(model.stack_numbers)],
                 decoder_input=tf.TensorSpec([None, model.max_decoder_length], dtype=tf.int32, name='decoder_input')),
         })
     print("Finish training")

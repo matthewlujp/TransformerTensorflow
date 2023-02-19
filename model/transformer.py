@@ -29,6 +29,10 @@ class Transformer(tf.keras.Model):
         self._decoder = Decoder(self._maxlen_dec, self._embedding_layer, self._vec_size, self._num_stacks, self._num_words)
 
     @property
+    def stack_numbers(self):
+        return self._num_stacks
+
+    @property
     def vector_size(self):
         return self._vec_size
 
@@ -65,7 +69,7 @@ class Transformer(tf.keras.Model):
     def decode(self, encoder_input, encoder_outputs, decoder_input):
         """
         encoder_input: (tf.Tensor) B, L
-        encoder_outputs: (tf.Tensor) N, B, L, V
+        encoder_outputs: (list) list of tf.Tensors B, L, V
         decoder_input: (tf.Tensor) B, L
         """
         enc_mask = tf.cast(tf.sign(encoder_input), tf.float32) # B,L
@@ -116,7 +120,6 @@ class Encoder(tf.keras.Model):
             x *= encoder_mask[..., None]
             encoder_outputs.append(x)
 
-        # return tf.stack(encoder_outputs, 0)
         return encoder_outputs
 
         
@@ -144,7 +147,6 @@ class Decoder(tf.keras.Model):
     @tf.function
     def call(self, encoder_outputs, encoder_mask, decoder_input, decoder_mask):
         """
-        inputs: (dict)
         encoder_outputs: H, B, L, V
         encoder_mask: B, L
         decoder_input: B, L
@@ -163,8 +165,6 @@ class Decoder(tf.keras.Model):
             
             # source-target attention
             x = self._source_target_attention_layers[i](
-                # query=x, key=tf.gather(encoder_outputs, i, axis=0),
-                # value=tf.gather(encoder_outputs, i, axis=0),
                 query=x, key=encoder_outputs[i],
                 value=encoder_outputs[i],
                 query_mask=decoder_mask, value_mask=encoder_mask)
@@ -176,7 +176,6 @@ class Decoder(tf.keras.Model):
         # apply linear layer and softmax
         x *= decoder_mask[..., None] # B,L,V
         x = self._output_dense(x)
-        # decoder_output = tfkl.Softmax()(x)
         decoder_output = x # output logit
         return decoder_output
 
