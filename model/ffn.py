@@ -15,7 +15,7 @@ class FFN(tf.keras.Model):
         self._dropout = tfkl.Dropout(self._dropout_rate)
         self._layer_norm = tfkl.LayerNormalization()
 
-    def call(self, x):
+    def call(self, x, training=None):
         """
         x: tf.Tensor B, L, V
         """
@@ -28,7 +28,7 @@ class FFN(tf.keras.Model):
             position_outputs.append(h)
 
         residual = tf.stack(position_outputs, axis=1) # [(B, V), (B, V), ...] -> B, L, V
-        residual = self._dropout(residual)
+        residual = self._dropout(residual, training=training)
         return self._layer_norm(residual + x)
 
 

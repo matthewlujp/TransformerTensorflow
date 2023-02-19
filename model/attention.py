@@ -21,7 +21,7 @@ class MultiheadAttention(tf.keras.Model):
         self._dropout = tfkl.Dropout(self._dropout_rate)
         self._layer_norm = tfkl.LayerNormalization()
 
-    def call(self, query, key, value, query_mask, value_mask):
+    def call(self, query, key, value, query_mask, value_mask, training=None):
         """
         query: tf.Tensor B,L,V
         key: tf.Tensor B,L,V
@@ -46,7 +46,7 @@ class MultiheadAttention(tf.keras.Model):
             head_outputs.append(head)
 
         x = tf.concat(head_outputs, -1) # B, L, V
-        x = self._dropout(x)
+        x = self._dropout(x, training=training)
         return self._layer_norm(x + query)
 
 
