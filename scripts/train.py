@@ -1,13 +1,9 @@
-import sys
 import pathlib
-import pickle
 from absl import app, flags
 import numpy as np
 import tensorflow as tf
 
-sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
-
-from model.transformer import Transformer
+from utils import load_data, create_dataset, create_model
 
 
 FLAGS = flags.FLAGS
@@ -15,8 +11,6 @@ flags.DEFINE_integer("epochs", 100, "number of epochs", short_name='e')
 flags.DEFINE_integer("batch_size", 32, "batch size", short_name='b')
 flags.DEFINE_string("savedir", None, "path to save training results", short_name='s')
 flags.DEFINE_string("checkpoint_file", None, "path to a checkpoint file to laod", short_name='c')
-# flags.DEFINE_string("logdir", None, "path to directory for TensorBoard", short_name='l')
-# flags.DEFINE_string("final_model_filepath", None, "path to save the final model", short_name='f')
 flags.DEFINE_string("data_filepath", None, "path to data", short_name='d')
 flags.DEFINE_float("validation_split_rate", 0.1, "ration of validation data in total", short_name='srate')
 flags.DEFINE_integer("maxlen_enc", 50, "max words in an input prompt")
@@ -62,29 +56,6 @@ def masked_accuracy(y_true, y_pred):
     return tf.reduce_mean(masked_acc)
     
 
-def load_data(filepath) -> dict:
-    data = pickle.loads(pathlib.Path(filepath).read_bytes())
-    return data
-
-
-def create_dataset(data, val_split_rate: float) -> tuple:
-    val_size = int(np.round(data['encoder_inputs'].shape[0] * val_split_rate))
-
-    train_dataset = tf.data.Dataset.from_tensor_slices((
-        {'encoder_input': data['encoder_inputs'][val_size:], 'decoder_input': data['decoder_inputs'][val_size:]},
-        data['labels'][val_size:]))
-    val_dataset = tf.data.Dataset.from_tensor_slices((
-        {'encoder_input': data['encoder_inputs'][:val_size], 'decoder_input': data['decoder_inputs'][:val_size]},
-        data['labels'][:val_size]))
-    return train_dataset, val_dataset
-    
-
-
-def create_model(maxlen_enc, maxlen_dec, vec_size, num_stacks, num_words, dataset) -> tf.keras.Model:
-    model = Transformer(maxlen_enc, maxlen_dec, vec_size, num_stacks, num_words)
-    x, _ = next(iter(dataset.batch(10)))
-    _ = model(x)
-    return model
     
 
 
