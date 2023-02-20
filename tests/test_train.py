@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.framework import random_seed
 
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1] / 'scripts'))
 from train import masked_sparse_entropy, masked_perplexity, masked_accuracy
 
 
@@ -69,7 +70,7 @@ class TestMetrics(tf.test.TestCase):
         self.assertEqual(expected, expected)
 
     def test_masked_accuracy_masked(self):
-        y_true = tf.constant([[1, 3, 0]], dtype=tf.int32)
+        y_true = tf.constant([[1, 3, 0]], dtype=tf.float32)
         y_pred = tf.constant([
             [
                 [0, 1, 0, 0, 0],
@@ -82,7 +83,7 @@ class TestMetrics(tf.test.TestCase):
         self.assertEqual(acc, expected)
 
     def test_masked_accuracy_partial_match(self):
-        y_true = tf.constant([[1, 3, 3]], dtype=tf.int32)
+        y_true = tf.constant([[1, 3, 3]], dtype=tf.float32)
         y_pred = tf.constant([
             [
                 [0, 1, 0, 0, 0],

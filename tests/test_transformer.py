@@ -5,7 +5,7 @@ import tensorflow as tf
 from tensorflow.python.framework import random_seed
 
 sys.path.append(pathlib.Path(__file__).resolve().parents[1])
-from model.transformer import Transformer
+from model.transformer import Transformer, get_positional_encoding
 
 np.random.seed(0)
 random_seed.set_seed(42)
@@ -23,8 +23,9 @@ class TestTransformer(tf.test.TestCase):
         self._num_words = 200
 
         self._model = Transformer(
-            self._maxlen_enc, self._maxlen_dec, self._vec_size, self._num_stacks, self._num_words)
-        
+            self._maxlen_enc, self._maxlen_dec, self._vec_size,
+            self._num_stacks, self._num_words)
+
     def tearDown(self):
         del self._model
 
@@ -52,7 +53,9 @@ class TestTransformer(tf.test.TestCase):
 
     def test_decode_output_shape(self):
         enc_input = tf.ones((1, self._maxlen_enc), dtype=tf.int32)
-        enc_outputs = [tf.ones((1, self._maxlen_enc, self._vec_size), dtype=tf.float32) for _ in range(self._num_stacks)]
+        enc_outputs = [
+            tf.ones((1, self._maxlen_enc, self._vec_size), dtype=tf.float32)
+            for _ in range(self._num_stacks)]
         dec_input = tf.ones((1, self._maxlen_dec), dtype=tf.int32)
         dec_output = self._model.decode(enc_input, enc_outputs, dec_input)
         expected_shape = (1, self._maxlen_dec, self._num_words)
@@ -68,6 +71,17 @@ class TestTransformer(tf.test.TestCase):
             dec_output[0, l:], 
             tf.zeros((self._maxlen_dec - l, self._num_words), tf.float32))
 
-        
+    def test_positional_encoding(self):
+        vec_size = 3
+        pos_enc = get_positional_encoding(self._maxlen_enc, vec_size)
+        expected = tf.stack([
+            tf.math.sin(tf.range(self._maxlen_enc, dtype=tf.float32) / tf.pow(10000.0, 0. / vec_size)),
+            tf.math.cos(tf.range(self._maxlen_enc, dtype=tf.float32) / tf.pow(10000.0, 0. / vec_size)),
+            tf.math.sin(tf.range(self._maxlen_enc, dtype=tf.float32) / tf.pow(10000.0, 2. / vec_size)),
+        ], axis=1)
+        self.assertNDArrayNear(pos_enc, expected, 1.0e-5)
+
+
+
 if __name__ == "__main__":
     tf.test.main()

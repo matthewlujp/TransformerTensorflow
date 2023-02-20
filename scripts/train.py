@@ -52,7 +52,7 @@ def masked_accuracy(y_true, y_pred):
     """
     mask = tf.cast(tf.sign(tf.abs(y_true)), dtype=tf.float32) # B, L  (1 if word, 0 if padding)
     sentence_lengths = tf.reduce_sum(mask, -1) # B
-    acc = tf.cast(tf.equal(y_true, tf.cast(tf.math.argmax(y_pred, axis=-1), dtype=tf.int32)), dtype=tf.float32) # B, L
+    acc = tf.cast(tf.equal(y_true, tf.cast(tf.math.argmax(y_pred, axis=-1), dtype=tf.float32)), dtype=tf.float32) # B, L
     masked_acc = tf.reduce_sum(acc * mask, axis=-1) / sentence_lengths # B, L
     return tf.reduce_mean(masked_acc)
     

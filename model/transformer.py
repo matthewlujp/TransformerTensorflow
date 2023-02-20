@@ -189,13 +189,15 @@ def get_positional_encoding(maxlen, vec_size, epsilon=1.e-5):
     """
     PE(p, 2i) = sin(p / 10000^(2i / vec_size))
     PE(p, 2i+1) = cos(p / 10000^(2i / vec_size))
+
+    return: L, V
     """
     evens = tf.range(vec_size, dtype=tf.float32) // 2 * 2 # 0, 0, 2, 2, 4, 4, ...
     pows = tf.pow(10000.0, evens / vec_size)
     reciprocals = tf.math.reciprocal(tf.maximum(pows, epsilon)) # V
     pos = tf.range(maxlen, dtype=tf.float32) # L
     phases = pos[:, None] @ reciprocals[None, :] # L, V
-    phase_slides = tf.cast(tf.range(vec_size) % 2, tf.float32) * np.pi # 0, pi, 0, pi, ...
+    phase_slides = tf.cast(tf.range(vec_size) % 2, tf.float32) * np.pi/2 # 0, pi/2, 0, pi/2, ...
     positional_encoding = tf.sin(phases + phase_slides[None, :]) # sin(p/10000^(0/V)), cos(p/10000^(0/V)), sin(p/10000^(2/V)), cos(p/10000^(2/V)), ...
     return positional_encoding
 
