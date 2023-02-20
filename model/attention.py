@@ -17,6 +17,7 @@ class MultiheadAttention(tf.keras.Model):
         self._q_dense_layers = [tfkl.Dense(self._head_size, use_bias=False) for _ in range(self._num_heads)]
         self._k_dense_layers = [tfkl.Dense(self._head_size, use_bias=False) for _ in range(self._num_heads)]
         self._v_dense_layers = [tfkl.Dense(self._head_size, use_bias=False) for _ in range(self._num_heads)]
+        self._out_dense = tfkl.Dense(self._vec_size, use_bias=False)
         self._softmax = tfkl.Softmax()
         self._dropout = tfkl.Dropout(self._dropout_rate)
         self._layer_norm = tfkl.LayerNormalization()
@@ -41,6 +42,7 @@ class MultiheadAttention(tf.keras.Model):
             head_outputs.append(head)
 
         x = tf.concat(head_outputs, -1) # B, L, V
+        x = self._out_dense(x)
         x = self._dropout(x, training=training)
         return self._layer_norm(x + query)
 

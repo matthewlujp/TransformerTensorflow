@@ -55,10 +55,6 @@ class Transformer(tf.keras.Model):
         encoder_input: B, L
         decoder_input: B, L
         """
-        # e_mask = tf.cast(tf.sign(inputs['encoder_input']), tf.float32) # B,L
-        # encoder_outputs = self._encoder(inputs['encoder_input'], e_mask, training=training)
-        # d_mask = tf.cast(tf.sign(inputs['decoder_input']), tf.float32) # B,L
-        # decoder_output = self._decoder(encoder_outputs, e_mask, inputs['decoder_input'], d_mask, training=training)
         encoder_outputs = self.encode(inputs['encoder_input'], training=training)
         decoder_output = self.decode(inputs['encoder_input'], encoder_outputs, inputs['decoder_input'], training=training)
         return decoder_output # B, L, NUM_WORD

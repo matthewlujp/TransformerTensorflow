@@ -15,7 +15,14 @@ def load_data(filepath) -> dict:
 
 
 def create_dataset(data, val_split_rate: float) -> tuple:
-    val_size = int(np.round(data['encoder_inputs'].shape[0] * val_split_rate))
+    data_size = data['encoder_inputs'].shape[0]
+    val_size = int(np.round(data_size * val_split_rate))
+    print(
+        f"""\n================================================================================
+
+        Total data size: {data_size}  (train: {data_size - val_size},   val: {val_size})
+
+        ================================================================================\n""")
 
     train_dataset = tf.data.Dataset.from_tensor_slices((
         {'encoder_input': data['encoder_inputs'][val_size:], 'decoder_input': data['decoder_inputs'][val_size:]},
@@ -23,6 +30,7 @@ def create_dataset(data, val_split_rate: float) -> tuple:
     val_dataset = tf.data.Dataset.from_tensor_slices((
         {'encoder_input': data['encoder_inputs'][:val_size], 'decoder_input': data['decoder_inputs'][:val_size]},
         data['labels'][:val_size]))
+
     return train_dataset, val_dataset
     
 
