@@ -8,7 +8,7 @@ from utils import load_data, create_dataset, create_model
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("epochs", 100, "number of epochs", short_name='e')
-flags.DEFINE_integer("batch_size", 32, "batch size", short_name='b')
+flags.DEFINE_integer("batch_size", 64, "batch size", short_name='b')
 flags.DEFINE_string("savedir", None, "path to save training results", short_name='s')
 flags.DEFINE_string("checkpoint_file", None, "path to a checkpoint file to laod", short_name='c')
 flags.DEFINE_string("data_filepath", None, "path to data", short_name='d')
@@ -51,8 +51,9 @@ def masked_accuracy(y_true, y_pred):
     y_pred: B, L, NUM_WORDS
     """
     mask = tf.cast(tf.sign(tf.abs(y_true)), dtype=tf.float32) # B, L  (1 if word, 0 if padding)
-    acc = tf.cast(tf.equal(y_true, tf.cast(tf.math.argmax(y_pred, axis=-1), dtype=tf.float32)), dtype=tf.float32) # B, L
-    masked_acc = acc * mask # B, L
+    sentence_lengths = tf.reduce_sum(mask, -1) # B
+    acc = tf.cast(tf.equal(y_true, tf.cast(tf.math.argmax(y_pred, axis=-1), dtype=tf.int32)), dtype=tf.float32) # B, L
+    masked_acc = tf.reduce_sum(acc * mask, axis=-1) / sentence_lengths # B, L
     return tf.reduce_mean(masked_acc)
     
 

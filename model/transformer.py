@@ -29,6 +29,10 @@ class Transformer(tf.keras.Model):
         self._decoder = Decoder(self._maxlen_dec, self._embedding_layer, self._vec_size, self._num_stacks, self._num_words)
 
     @property
+    def embedding_layer(self):
+        return self._embedding_layer
+
+    @property
     def stack_numbers(self):
         return self._num_stacks
 
@@ -51,10 +55,12 @@ class Transformer(tf.keras.Model):
         encoder_input: B, L
         decoder_input: B, L
         """
-        e_mask = tf.cast(tf.sign(inputs['encoder_input']), tf.float32) # B,L
-        encoder_outputs = self._encoder(inputs['encoder_input'], e_mask, training=training)
-        d_mask = tf.cast(tf.sign(inputs['decoder_input']), tf.float32) # B,L
-        decoder_output = self._decoder(encoder_outputs, e_mask, inputs['decoder_input'], d_mask, training=training)
+        # e_mask = tf.cast(tf.sign(inputs['encoder_input']), tf.float32) # B,L
+        # encoder_outputs = self._encoder(inputs['encoder_input'], e_mask, training=training)
+        # d_mask = tf.cast(tf.sign(inputs['decoder_input']), tf.float32) # B,L
+        # decoder_output = self._decoder(encoder_outputs, e_mask, inputs['decoder_input'], d_mask, training=training)
+        encoder_outputs = self.encode(inputs['encoder_input'], training=training)
+        decoder_output = self.decode(inputs['encoder_input'], encoder_outputs, inputs['decoder_input'], training=training)
         return decoder_output # B, L, NUM_WORD
 
     @tf.function
@@ -75,9 +81,6 @@ class Transformer(tf.keras.Model):
         enc_mask = tf.cast(tf.sign(encoder_input), tf.float32) # B,L
         dec_mask = tf.cast(tf.sign(decoder_input), tf.float32) # B,L
         return self._decoder(encoder_outputs, enc_mask, decoder_input, dec_mask, training=training)
-
-        
-        
 
 
 

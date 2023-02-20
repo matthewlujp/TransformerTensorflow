@@ -35,25 +35,30 @@ class MultiheadAttention(tf.keras.Model):
             K = self._k_dense_layers[h](key) # B, L, h
             V = self._v_dense_layers[h](value) # B, L, h
 
-            attention = self._softmax(Q @ tf.transpose(K, [0,2,1]) / tf.sqrt(float(self._head_size))) # B, L, L = B, Q, V
+            attention = self.calculate_attention(Q, K, query_mask, value_mask) # B, L, L = B, Q, V
 
-            # masking
-            if self._apply_triangle_mask:
-                attention *= get_trainagle_mask(attention)
-            attention *= query_mask[..., None] * value_mask[:, None, :]
-
-            head = attention @ V
+            head = self.weighted_combination(attention, V)
             head_outputs.append(head)
 
         x = tf.concat(head_outputs, -1) # B, L, V
         x = self._dropout(x, training=training)
         return self._layer_norm(x + query)
 
+    def calculate_attention(self, query, key, query_mask, value_mask) -> tf.Tensor:
+        attn = self._softmax(query @ tf.transpose(key, [0,2,1]) / tf.sqrt(float(self._head_size))) # B, L, L = B, Q, V
+
+        # masking
+        if self._apply_triangle_mask:
+            attn *= get_triangle_mask(attn)
+        attn *= query_mask[..., None] * value_mask[:, None, :]
+        return attn
+
+    def weighted_combination(self, weights: tf.Tensor, values: tf.Tensor) -> tf.Tensor:
+        return weights @ values
 
 
 
-
-def get_trainagle_mask(mat: tf.Tensor) -> tf.Tensor:
+def get_triangle_mask(mat: tf.Tensor) -> tf.Tensor:
     """
     mat: (tf.Tensor) B,L,L
 
