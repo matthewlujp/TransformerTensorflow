@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.framework import random_seed
 
-sys.path.append(pathlib.Path(__file__).resolve().parents[1])
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from model.transformer import Transformer, get_positional_encoding
 
 np.random.seed(0)
@@ -36,28 +36,22 @@ class TestTransformer(tf.test.TestCase):
 
     def test_encode_output_shape(self):
         x = tf.ones((1, self._maxlen_enc), dtype=tf.int32)
-        encoder_outputs = self._model.encode(x)
-        self.assertEqual(len(encoder_outputs), self._num_stacks)
-        for o in encoder_outputs:
-            self.assertAllEqual((1, self._maxlen_enc, self._vec_size), o.shape)
+        encoder_output = self._model.encode(x)
+        self.assertAllEqual((1, self._maxlen_enc, self._vec_size), encoder_output.shape)
 
     def test_encode_mask(self):
         l = int(self._maxlen_enc * 0.7)
         x = tf.constant([[1] * l + [0] * (self._maxlen_enc - l)], dtype=tf.float32)
-        encoder_outputs = self._model.encode(x)
-        for i, o in enumerate(encoder_outputs):
-            self.assertAllEqual(
-                o[0, l:],
-                tf.tile(tf.constant([0] * (self._maxlen_enc - l))[..., None], [1, self._vec_size]),
-                f"layer {i}, result {o}")
+        encoder_output = self._model.encode(x)
+        self.assertAllEqual(
+            encoder_output[0, l:],
+            tf.tile(tf.constant([0] * (self._maxlen_enc - l))[..., None], [1, self._vec_size]))
 
     def test_decode_output_shape(self):
         enc_input = tf.ones((1, self._maxlen_enc), dtype=tf.int32)
-        enc_outputs = [
-            tf.ones((1, self._maxlen_enc, self._vec_size), dtype=tf.float32)
-            for _ in range(self._num_stacks)]
+        enc_output = tf.ones((1, self._maxlen_enc, self._vec_size), dtype=tf.float32)
         dec_input = tf.ones((1, self._maxlen_dec), dtype=tf.int32)
-        dec_output = self._model.decode(enc_input, enc_outputs, dec_input)
+        dec_output = self._model.decode(enc_input, enc_output, dec_input)
         expected_shape = (1, self._maxlen_dec, self._num_words)
         self.assertAllEqual(dec_output.shape, expected_shape)
 
@@ -65,8 +59,8 @@ class TestTransformer(tf.test.TestCase):
         l = int(self._maxlen_dec * 0.7)
         dec_input = tf.constant([[1] * l + [0] * (self._maxlen_dec - l)], dtype=tf.float32)
         enc_input = tf.ones((1, self._maxlen_enc), dtype=tf.int32)
-        enc_outputs = [tf.ones((1, self._maxlen_enc, self._vec_size), dtype=tf.float32) for _ in range(self._num_stacks)]
-        dec_output = self._model.decode(enc_input, enc_outputs, dec_input)
+        enc_output = tf.ones((1, self._maxlen_enc, self._vec_size), dtype=tf.float32)
+        dec_output = self._model.decode(enc_input, enc_output, dec_input)
         self.assertAllEqual(
             dec_output[0, l:], 
             tf.zeros((self._maxlen_dec - l, self._num_words), tf.float32))

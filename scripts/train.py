@@ -139,9 +139,7 @@ def train(_):
             'encode': model.encode.get_concrete_function(tf.TensorSpec([None, model.max_encoder_length], dtype=tf.int32, name='encoder_input')),
             'decode': model.decode.get_concrete_function(
                 encoder_input=tf.TensorSpec([None, model.max_encoder_length], dtype=tf.int32, name='encoder_input'),
-                encoder_outputs=[
-                    tf.TensorSpec([None, model.max_encoder_length, model.vector_size], dtype=tf.float32, name='encoder_outputs')
-                    for _ in range(model.stack_numbers)],
+                encoder_outputs=tf.TensorSpec([None, model.max_encoder_length, model.vector_size], dtype=tf.float32, name='encoder_outputs'),
                 decoder_input=tf.TensorSpec([None, model.max_decoder_length], dtype=tf.int32, name='decoder_input')),
         })
     print("Finish training")

@@ -55,8 +55,8 @@ class Transformer(tf.keras.Model):
         encoder_input: B, L
         decoder_input: B, L
         """
-        encoder_outputs = self.encode(inputs['encoder_input'], training=training)
-        decoder_output = self.decode(inputs['encoder_input'], encoder_outputs, inputs['decoder_input'], training=training)
+        encoder_output = self.encode(inputs['encoder_input'], training=training)
+        decoder_output = self.decode(inputs['encoder_input'], encoder_output, inputs['decoder_input'], training=training)
         return decoder_output # B, L, NUM_WORD
 
     @tf.function
@@ -111,15 +111,14 @@ class Encoder(tf.keras.Model):
         x += pos_emb[None, ...] # B, L, V
         x = self._dropout(x, training=training)
         
-        encoder_outputs = []
         for i in range(self._num_stacks):
             x = self._attention_layers[i](
-                query=x, key=x, value=x, query_mask=encoder_mask, value_mask=encoder_mask, training=training)
+                query=x, memory=x, query_mask=encoder_mask,
+                memory_mask=encoder_mask, training=training)
             x = self._ffn_layers[i](x, training=training)
             x *= encoder_mask[..., None]
-            encoder_outputs.append(x)
 
-        return encoder_outputs
+        return x
 
         
 
@@ -136,17 +135,20 @@ class Decoder(tf.keras.Model):
         self._layer_norm = tfkl.LayerNormalization(axis=2)
         self._dropout = tfkl.Dropout(DROPOUT_RATE)
         self._self_attention_layers = [
-            MultiheadAttention(self._vec_size, NUM_HEADS, DROPOUT_RATE, apply_triangle_mask=True) for _ in range(self._num_stacks)]
+            MultiheadAttention(self._vec_size, NUM_HEADS, DROPOUT_RATE, apply_triangle_mask=True)
+            for _ in range(self._num_stacks)]
         self._source_target_attention_layers = [
-            MultiheadAttention(self._vec_size, NUM_HEADS, DROPOUT_RATE) for _ in range(self._num_stacks)]
+            MultiheadAttention(self._vec_size, NUM_HEADS, DROPOUT_RATE)
+            for _ in range(self._num_stacks)]
         self._ffn_layers = [
-            FFN(self._maxlen, self._vec_size, DROPOUT_RATE) for _ in range(self._num_stacks)]
+            FFN(self._maxlen, self._vec_size, DROPOUT_RATE)
+            for _ in range(self._num_stacks)]
         self._output_dense = tfkl.Dense(self._num_words)
 
     @tf.function
-    def call(self, encoder_outputs, encoder_mask, decoder_input, decoder_mask, training=None):
+    def call(self, encoder_output, encoder_mask, decoder_input, decoder_mask, training=None):
         """
-        encoder_outputs: H, B, L, V
+        encoder_output: B, L, V
         encoder_mask: B, L
         decoder_input: B, L
         decoder_mask: B, L
@@ -160,13 +162,12 @@ class Decoder(tf.keras.Model):
 
         for i in range(self._num_stacks):
             x = self._self_attention_layers[i](
-                query=x, key=x, value=x, query_mask=decoder_mask, value_mask=decoder_mask, training=training)
+                query=x, memory=x, query_mask=decoder_mask, memory_mask=decoder_mask, training=training)
             
             # source-target attention
             x = self._source_target_attention_layers[i](
-                query=x, key=encoder_outputs[i],
-                value=encoder_outputs[i],
-                query_mask=decoder_mask, value_mask=encoder_mask,
+                query=x, memory=encoder_output,
+                query_mask=decoder_mask, memory_mask=encoder_mask,
                 training=training)
 
             # FNN

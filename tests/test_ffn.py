@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.framework import random_seed
 
-sys.path.append(pathlib.Path(__file__).resolve().parents[1])
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from model.ffn import FFN
 
 np.random.seed(0)

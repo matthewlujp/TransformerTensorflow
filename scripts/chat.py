@@ -50,9 +50,9 @@ def convert_symbols(enc_maxlen, words, word2index, cns_input) -> np.ndarray:
 
 def calculate_response(model: Transformer, words, word2index, index2word, prompt):
     encoder_input = convert_symbols(model.max_encoder_length, words, word2index, prompt)
-    encoder_outputs = model.encode(encoder_input)
+    encoder_output = model.encode(encoder_input)
 
-    verbose(f"encoder outputs, {[v.shape for v in encoder_outputs]}")
+    verbose(f"encoder outputs, {[v.shape for v in encoder_output]}")
 
     decoder_input = np.zeros((1, model.max_decoder_length), np.int32)
     decoder_input[0, 0] = word2index['SSSS']
@@ -60,7 +60,7 @@ def calculate_response(model: Transformer, words, word2index, index2word, prompt
 
     for i in range(model.max_decoder_length):
         decoder_output = model.decode(
-            encoder_input, encoder_outputs, decoder_input).numpy() # 1, L, NUM_WORDS
+            encoder_input, encoder_output, decoder_input).numpy() # 1, L, NUM_WORDS
         sampled_token = np.argmax(decoder_output[0, i, :], axis=-1)
         sampled_word = index2word[sampled_token]
         verbose(f"sampled token: {sampled_token}   sampled word: {sampled_word}")
