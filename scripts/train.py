@@ -63,12 +63,15 @@ def masked_accuracy(y_true, y_pred):
 
 class UpdateLearningRate(tf.keras.callbacks.Callback):
     warmup_steps = 4000.0
+    # warmup_steps = 8000.0
+    max_lr = 0.0001
 
     def on_batch_begin(self, batch, logs=None):
         step = np.maximum(self.model.optimizer.iterations.numpy(), 0.5)
-        self.model.optimizer.lr.assign(
-            tf.pow(float(self.model.vector_size), -0.5)
-            * tf.minimum(tf.pow(float(step), -0.5), step * tf.pow(self.warmup_steps, -1.5)))
+        # lr = tf.pow(float(self.model.vector_size), -0.5) \
+        #     * tf.minimum(tf.pow(float(step), -0.5), step * tf.pow(self.warmup_steps, -1.5))
+        lr = self.max_lr * min(step ** -0.5, step * self.warmup_steps ** -1.5) / self.warmup_steps ** -0.5
+        self.model.optimizer.lr.assign(lr)
 
 
 
@@ -117,7 +120,7 @@ def train(_):
             tf.keras.callbacks.ModelCheckpoint(
               filepath=str(ckptdir) + "/checkpoint-epoch={epoch:02d}-val_loss={val_loss:.02f}.hdf5",
               save_freq='epoch', save_weights_only=True),
-            tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=0, start_from_epoch=20, verbose=1),
+            tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=0, start_from_epoch=50, verbose=1),
             tf.keras.callbacks.TensorBoard(logdir, histogram_freq=10),
             UpdateLearningRate(),
         ],

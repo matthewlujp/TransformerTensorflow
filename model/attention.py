@@ -14,20 +14,19 @@ class MultiheadAttention(tf.keras.Model):
         self._dropout_rate = dropout_rate
         self._apply_triangle_mask = apply_triangle_mask
 
-        self._q_dense = tfkl.Dense(self._vec_size, use_bias=False)
-        self._k_dense = tfkl.Dense(self._vec_size, use_bias=False)
-        self._v_dense = tfkl.Dense(self._vec_size, use_bias=False)
-        self._out_dense = tfkl.Dense(self._vec_size, use_bias=False)
+        self._q_dense = tfkl.Dense(self._vec_size, use_bias=False, name="q_dense_layer")
+        self._k_dense = tfkl.Dense(self._vec_size, use_bias=False, name="k_dense_layer")
+        self._v_dense = tfkl.Dense(self._vec_size, use_bias=False, name="v_dense_layer")
+        self._out_dense = tfkl.Dense(self._vec_size, use_bias=False, name="multihead_attention_out_dense_layer")
         self._softmax = tfkl.Softmax()
         self._softmax_dropout = tfkl.Dropout(self._dropout_rate)
         self._out_dropout = tfkl.Dropout(self._dropout_rate)
         self._layer_norm = tfkl.LayerNormalization()
 
-    def call(self, query, memory, query_mask, memory_mask, training=None):
+    def call(self, query, memory, memory_mask, training=None):
         """
         query: tf.Tensor B,L,V
         memory: tf.Tensor B,L,V
-        query_mask: tf.Tensor B,L
         memory_mask: tf.Tensor B,L
         """
         Qs = tf.split(self._q_dense(query), self._num_heads, axis=-1) # B, L, h
@@ -35,10 +34,9 @@ class MultiheadAttention(tf.keras.Model):
         Vs = tf.split(self._v_dense(memory), self._num_heads, axis=-1) # B, L, h
 
         head_outputs = []
-
         for h in range(self._num_heads):
-            attention = self.calculate_attention(
-                Qs[h], Ks[h], query_mask, memory_mask, training=training) # B, L, L = B, Q, V
+            attention = self.calculate_attention(Qs[h], Ks[h], memory_mask) # B, L, L = B, Q, V
+            attention = self._softmax_dropout(attention, training=training)
             head = self.weighted_combination(attention, Vs[h])
             head_outputs.append(head)
 
@@ -47,7 +45,7 @@ class MultiheadAttention(tf.keras.Model):
         x = self._out_dropout(x, training=training)
         return self._layer_norm(x + query)
 
-    def calculate_attention(self, query, key, query_mask, value_mask, training=None) -> tf.Tensor:
+    def calculate_attention(self, query, key, value_mask) -> tf.Tensor:
         attn = query @ tf.transpose(key, [0,2,1]) / tf.sqrt(float(tf.shape(key)[-1])) # B, L, L = B, Q, V
 
         # masking
@@ -58,13 +56,10 @@ class MultiheadAttention(tf.keras.Model):
         attn += (value_mask[:, None, :] - 1.0) * tf.float32.max
 
         attn = self._softmax(attn) # B, L, L = B, Q, V
-        attn *= query_mask[..., None]
-        attn = self._softmax_dropout(attn, training=training)
         return attn
 
     def weighted_combination(self, weights: tf.Tensor, values: tf.Tensor) -> tf.Tensor:
         return weights @ values
-
 
 
 def get_triangle_mask(mat: tf.Tensor) -> tf.Tensor:

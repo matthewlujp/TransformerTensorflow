@@ -20,9 +20,10 @@ class FFN(tf.keras.Model):
         """
         x: tf.Tensor B, L, V
         """
-        residual = self._hidden_dense(x)
+        residual = x
+        residual = self._hidden_dense(residual)
         residual = self._hidden_dropout(residual, training=training)
-        residual = self._out_dense(x)
+        residual = self._out_dense(residual)
         residual = self._out_dropout(residual, training=training)
         return self._layer_norm(residual + x)
 

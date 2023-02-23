@@ -3,12 +3,12 @@ import pathlib
 import pickle
 from absl import app, flags
 import numpy as np
+import tensorflow as tf
 from pyknp import Juman
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from model.transformer import Transformer
-from utils import load_data, create_dataset, create_model
-
+from utils import load_data, create_dataset, create_model, convert_symbols
 
 
 FLAGS = flags.FLAGS
@@ -22,46 +22,32 @@ flags.DEFINE_bool("test", False, "trigger test", short_name='t')
 flags.DEFINE_bool("verbose", False, "print process logs")
 
 
+tf.config.run_functions_eagerly(True)
+
+
 def verbose(*args):
     if not FLAGS.verbose: return
     print(*args)
 
 
-def convert_symbols(enc_maxlen, words, word2index, cns_input) -> np.ndarray:
-    """
-    return: (np.ndarray) 1, L
-    """
-    # Use Juman++ in subprocess mode
-    jumanpp = Juman()
-    result = jumanpp.analysis(cns_input)
-    input_text=[]
-    for mrph in result.mrph_list():
-        input_text.append(mrph.midasi)
-
-    #入力データe_inputに入力文の単語インデックスを設定
-    e_input=np.zeros((1, enc_maxlen))
-    for i, w in enumerate(input_text):
-        if i >= enc_maxlen: break
-        e_input[0,i] = word2index[w] if w in words else word2index['UNK']
-
-    return e_input
-
-
-
 def calculate_response(model: Transformer, words, word2index, index2word, prompt):
+    verbose("input text:", prompt)
     encoder_input = convert_symbols(model.max_encoder_length, words, word2index, prompt)
+    verbose("encoder input:", encoder_input)
     encoder_output = model.encode(encoder_input)
 
-    verbose(f"encoder outputs, {[v.shape for v in encoder_output]}")
+    verbose(f"encoder outputs: {encoder_output}")
 
     decoder_input = np.zeros((1, model.max_decoder_length), np.int32)
     decoder_input[0, 0] = word2index['SSSS']
     decoded_sentence = []
 
     for i in range(model.max_decoder_length):
+        verbose("decoder input:", decoder_input[0])
         decoder_output = model.decode(
             encoder_input, encoder_output, decoder_input).numpy() # 1, L, NUM_WORDS
-        sampled_token = np.argmax(decoder_output[0, i, :], axis=-1)
+        verbose("decoder output:", tf.argmax(decoder_output[0], axis=-1).numpy())
+        sampled_token = np.argmax(decoder_output[0, i], axis=-1)
         sampled_word = index2word[sampled_token]
         verbose(f"sampled token: {sampled_token}   sampled word: {sampled_word}")
         if sampled_word == 'SSSS':
@@ -89,6 +75,10 @@ def test():
     train_dataset, _ = create_dataset(data, 0.1)
     model = create_model(FLAGS.maxlen_enc, FLAGS.maxlen_dec, FLAGS.vec_size, FLAGS.num_stacks, len(data['words']), train_dataset)
 
+    model_filepath = pathlib.Path(FLAGS.model_filepath)
+    print(f"Loading checkpoint from {str(model_filepath)}.")
+    model.load_weights(str(model_filepath))
+
     prompt = "吾輩は猫である。"
     response = calculate_response(model, words, word2index, index2word, prompt)
     print(f"OUTPUT: {response}")
@@ -103,6 +93,10 @@ def chat():
 
     train_dataset, _ = create_dataset(data, 0.1)
     model = create_model(FLAGS.maxlen_enc, FLAGS.maxlen_dec, FLAGS.vec_size, FLAGS.num_stacks, len(data['words']), train_dataset)
+
+    model_filepath = pathlib.Path(FLAGS.model_filepath)
+    print(f"Loading checkpoint from {str(model_filepath)}.")
+    model.load_weights(str(model_filepath))
 
     while True:
         prompt = input("INPUT > ")
